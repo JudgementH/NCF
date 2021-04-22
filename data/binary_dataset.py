@@ -9,35 +9,42 @@ __author__ = 'Judgement'
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-from data.preprocess import read_csv
+from data.preprocess import read_csv, save_csv
 
 
-class RatingDataSet(Dataset):
+class BinaryDataSet(Dataset):
 
     def __init__(self, data_path, negative_num):
-        super(RatingDataSet, self).__init__()
+        super(BinaryDataSet, self).__init__()
         self.data_path = data_path
         self.negative_num = negative_num
-        self.rating_list = np.array(read_csv(data_path, skip_first=True))
+        self.rating_list = np.array(read_csv(data_path))
         self.user_size = max(self.rating_list[:, 0]) + 1
         self.movie_size = max(self.rating_list[:, 1]) + 1
 
-    def make_negative(self):
-        negative_rating_list = []
+    def make_negative(self, save_path, test_positive_path):
+        test_positive = read_csv(test_positive_path)
         self.positive_set = []
         self.negative_set = []
+        last_user_id = 0
         for element in self.rating_list:
             user_id = element[0]
-            movie_id_positive = element[1]
-            self.positive_set.append((user_id, movie_id_positive))
-
-        for element in self.positive_set:
-            user_id = element[0]
-            for i in range(self.negative_num):
-                movie_id_negative = np.random.randint(self.movie_size)
-                while (user_id, movie_id_negative) in self.positive_set:
+            if user_id != last_user_id:
+                # make negative
+                print("now generating negative sample user_id: %d" % last_user_id)
+                for i in range(self.negative_num * len(self.positive_set)):
                     movie_id_negative = np.random.randint(self.movie_size)
-                self.negative_set.append([user_id, movie_id_negative, 0])
+                    while movie_id_negative in self.positive_set or movie_id_negative == test_positive[user_id][1]:
+                        movie_id_negative = np.random.randint(self.movie_size)
+                    self.negative_set.append([last_user_id, movie_id_negative, 0])
+                self.positive_set = []
+            movie_id_positive = element[1]
+            self.positive_set.append(movie_id_positive)
+            last_user_id = user_id
+
+        self.negative_set = np.array(self.negative_set)
+        self.rating_list = np.concatenate((self.rating_list, self.negative_set), axis=0)
+        save_csv(self.rating_list.astype(np.int32), save_path=save_path)
 
     def __len__(self):
         return len(self.rating_list)
@@ -59,14 +66,16 @@ class RatingDataSet(Dataset):
 
 
 if __name__ == '__main__':
-    A = '../res/mov_normal.csv'
+    A = '../res/mov_normal_with_negative.csv'
     B = '../res/dvd_sparse.csv'
-    dataset = RatingDataSet(A, 4)
+    C = '../res/mov_normal.csv'
+    dataset = BinaryDataSet(C, 4)
     print(dataset.user_size)
     print(dataset.movie_size)
     print(len(dataset.rating_list))
 
-    dataset.make_negative()
+    dataset.make_negative(save_path='../res/mov_normal_with_negative.csv',
+                          test_positive_path='../res/mov_test_positive.csv')
 
-    # dataloader = DataLoader(dataset, batch_size=10, shuffle=True, collate_fn=dataset.collate_fn)
-    # print(iter(dataloader).next())
+    dataloader = DataLoader(dataset, batch_size=10, shuffle=True, collate_fn=dataset.collate_fn)
+    print(iter(dataloader).next())
