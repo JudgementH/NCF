@@ -18,6 +18,7 @@ class BaseOption():
         self.parser.add_argument('--movie_embedding_dim', type=int, default=32, help='movie embedding layer dim')
         self.parser.add_argument('--ncf_mf_embedding', type=int, default=32, help='ncf mf layers= embedding dim')
         self.parser.add_argument('--ncf_mlp_embedding', type=int, default=32, help='ncf mlp layers= embedding dim')
+        self.parser.add_argument('--convncf_embedding_dim', type=int, default=32, help='ConvNCF embedding dim')
 
         self.parser.add_argument('--ncf_layers', type=int, default=3, help='ncf MLP layer nums')
 
